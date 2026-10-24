@@ -201,6 +201,19 @@ body {
   border-radius: 99px; padding: 8px 12px; display: inline-flex; align-items: center; gap: 6px;
   animation: fadeUp .6s both;
 }
+.soundbtn {
+  position: absolute; z-index: 4;
+  top: calc(env(safe-area-inset-top, 0px) + 14px);
+  left: max(14px, env(safe-area-inset-left, 0px));
+  width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; padding: 0; cursor: pointer;
+  color: var(--lantern); background: rgba(25, 22, 48, .55); border: 1px solid rgba(245, 211, 138, .55);
+  animation: fadeUp .6s both;
+}
+.soundbtn svg { width: 20px; height: 20px; }
+.soundbtn .cross { display: none; }
+.soundbtn.muted .cross { display: inline; }
+.soundbtn.muted .waves { display: none; }
+.soundbtn:focus-visible { outline: 2px solid var(--lantern); outline-offset: 2px; }
 .quizpill b { color: var(--lantern); font-weight: 600; }
 .quizpill:hover { background: rgba(25, 22, 48, .8); }
 .quizpill:focus-visible { outline: 2px solid var(--lantern); outline-offset: 2px; }
@@ -403,6 +416,10 @@ body {
     </button>
   </div>
 
+  <audio id="song" src="song.mp3" loop preload="auto"></audio>
+  <button class="soundbtn" id="soundbtn" hidden aria-label="Mute music" aria-pressed="false">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4z" fill="currentColor"/><path class="waves" d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/><path class="cross" d="M16.5 9.5l5 5m0-5l-5 5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+  </button>
   <button class="quizpill" id="quizpill" hidden aria-label="See your quiz score or play again">Quiz <b id="quizpill-score"></b></button>
   <div class="counter" id="counter" aria-live="polite"></div>
 </main>
@@ -595,6 +612,7 @@ $("gift").addEventListener("click", () => {
   if (state.quizDone) return openFinale();
   if (state.opened) return openLetter();
   state.opened = true;
+  startMusic();
   $("gift").classList.add("open");
   $("gift").setAttribute("aria-label", "Read the letter again");
   $("giftlabel").textContent = "read again";
@@ -748,6 +766,37 @@ function openFinale() {
     ]
   });
 }
+
+/* background music: starts on the first tap, fades in, can be muted */
+const song = $("song"), soundBtn = $("soundbtn");
+const MUSIC_VOLUME = 0.55;
+let muted = false;
+function fadeTo(target, ms) {
+  const start = song.volume, t0 = performance.now();
+  (function step(t) {
+    const k = Math.min(1, (t - t0) / ms);
+    song.volume = start + (target - start) * k;
+    if (k < 1) requestAnimationFrame(step); else if (target === 0) song.pause();
+  })(t0);
+}
+function startMusic() {
+  song.volume = 0;
+  const p = song.play();
+  if (p && p.then) p.then(() => fadeTo(MUSIC_VOLUME, 3000)).catch(() => {});
+  soundBtn.hidden = false;
+}
+soundBtn.addEventListener("click", () => {
+  muted = !muted;
+  soundBtn.classList.toggle("muted", muted);
+  soundBtn.setAttribute("aria-pressed", String(muted));
+  soundBtn.setAttribute("aria-label", muted ? "Play music" : "Mute music");
+  if (muted) fadeTo(0, 400);
+  else { song.play().then(() => fadeTo(MUSIC_VOLUME, 800)).catch(() => {}); }
+});
+document.addEventListener("visibilitychange", () => {
+  if (!state.opened || muted) return;
+  if (document.hidden) song.pause(); else song.play().catch(() => {});
+});
 
 /* sky: stars and fireflies */
 (function sky() {
